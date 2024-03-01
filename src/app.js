@@ -1,51 +1,63 @@
-import React from 'react';
-import { createElement, getWordNumbers } from './utils.js';
-import './styles.css';
+import React, { useCallback, useState } from 'react';
+import List from "./components/list";
+import Controls from "./components/controls";
+import Head from "./components/head";
+import PageLayout from "./components/page-layout";
+import ModalLayout from "./components/modal-layout";
+import Item from "./components/item";
+import BasketItem from "./components/basket-item";
+import BasketSum from "./components/basket-sum";
 
 /**
  * Приложение
- * @param store {Store} Состояние приложения
+ * @param store {Store} Хранилище состояния приложения
  * @returns {React.ReactElement}
  */
-function App({ store }) {
-  const list = store.getState().list;
+function App({store}) {
+
+  const state = store.getState();
+
+  const callbacks = {
+    addBasket: useCallback((code) => {
+      store.addBasketItem(code);
+    }, [store]),
+
+    removeBasket: useCallback((code) => {
+      store.removeItemBasket(code);
+    }, [store]),
+
+    openBasketModal: useCallback(() => {
+      store.openModal('modalBasket');
+    }, [store]),
+
+    closeModal: useCallback(() => {
+      store.closeModal();
+    }, [store])
+  }
+
+  const rendersList = useCallback((item, isBasketItem) => {
+    if (isBasketItem) {
+      return <BasketItem item={item} onRemove={callbacks.removeBasket}/>;
+    } else {
+      return <Item item={item} onAdd={callbacks.addBasket}/>;
+    }
+  }, [callbacks.addBasket, callbacks.removeBasket]);
 
   return (
-    <div className="App">
-      <div className="App-head">
-        <h1>Приложение на чистом JS</h1>
-      </div>
-      <div className="App-controls">
-        <button onClick={() => store.addItem()}>Добавить</button>
-      </div>
-      <div className="App-center">
-        <div className="List">
-          {list.map((item) => (
-            <div key={item.code} className="List-item">
-              <div
-                className={'Item' + (item.selected ? ' Item_selected' : '')}
-                onClick={() => store.selectItem(item.code)}>
-                <div className="Item-code">{item.code}</div>
-                <div className="Item-title">
-                  {item.title}
-                  {item.count === 0
-                    ? ''
-                    : ` | Выделяли ${item.count} ${getWordNumbers(item.count)}`}
-                </div>
-                <div className="Item-actions">
-                  <button
-                    onClick={(e) => {
-                      store.deleteItem(e, item.code);
-                    }}>
-                    Удалить
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <>
+      <PageLayout>
+        <Head title='Магазин'/>
+        <Controls onAdd={callbacks.openBasketModal} sum={state.basketItems.sum} count={state.basketItems.count}/>
+        <List list={state.list} viewItem={(item) => rendersList(item, false)}/>
+      </PageLayout>
+      {
+        state.modal === 'modalBasket' &&
+        <ModalLayout title={'Корзина'} closeModal={callbacks.closeModal}>
+          <List list={state.basketItems.list} viewItem={(item) => rendersList(item, true)}/>
+          <BasketSum total={state.basketItems.sum}/>
+        </ModalLayout>
+      }
+    </>
   );
 }
 

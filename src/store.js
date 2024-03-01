@@ -1,17 +1,13 @@
+import {generateCode} from "./utils";
+import item from "./components/item";
+
 /**
  * Хранилище состояния приложения
  */
 class Store {
   constructor(initState = {}) {
-    initState.list = initState.list.map((item) => {
-      return {
-        ...item,
-        count: 0,
-      };
-    });
     this.state = initState;
     this.listeners = []; // Слушатели изменений состояния
-    this.uniqueCode = Math.max(...initState.list.map((item) => item.code), 0) + 1;
   }
 
   /**
@@ -23,8 +19,8 @@ class Store {
     this.listeners.push(listener);
     // Возвращается функция для удаления добавленного слушателя
     return () => {
-      this.listeners = this.listeners.filter((item) => item !== listener);
-    };
+      this.listeners = this.listeners.filter(item => item !== listener);
+    }
   }
 
   /**
@@ -51,28 +47,21 @@ class Store {
   addItem() {
     this.setState({
       ...this.state,
-      list: [
-        ...this.state.list,
-        {
-          code: this.uniqueCode++,
-          title: 'Новая запись',
-          count: 0,
-        },
-      ],
-    });
-  }
+      list: [...this.state.list, {code: generateCode(), title: 'Новая запись'}]
+    })
+  };
 
   /**
    * Удаление записи по коду
    * @param code
    */
-  deleteItem(e, code) {
-    e.stopPropagation();
+  deleteItem(code) {
     this.setState({
       ...this.state,
-      list: this.state.list.filter((item) => item.code !== code),
-    });
-  }
+      // Новый список, в котором не будет удаляемой записи
+      list: this.state.list.filter(item => item.code !== code)
+    })
+  };
 
   /**
    * Выделение записи по коду
@@ -81,19 +70,75 @@ class Store {
   selectItem(code) {
     this.setState({
       ...this.state,
-      list: this.state.list.map((item) => {
+      list: this.state.list.map(item => {
         if (item.code === code) {
-          if (!item.selected) {
-            item.count += 1;
-          }
-          item.selected = !item.selected;
-        } else {
-          item.selected = false;
+          // Смена выделения и подсчёт
+          return {
+            ...item,
+            selected: !item.selected,
+            count: item.selected ? item.count : item.count + 1 || 1,
+          };
         }
-        return item;
-      }),
-    });
+        // Сброс выделения если выделена
+        return item.selected ? {...item, selected: false} : item;
+      })
+    })
   }
+
+  openModal(name) {
+    this.setState({...this.state, modal: name});
+  }
+
+  closeModal() {
+    this.setState({...this.state, modal: false});
+  }
+
+
+  addBasketItem(code) {
+    let finder = false;
+
+    const list = this.getState().basketItems.list.map(item => {
+      if (item.code === code) {
+        finder = true
+        return {...item, counter: item.counter + 1}
+      } else {
+        return item
+      }
+    })
+
+    if (!finder) {
+      const item = this.getState().list.find(item => item.code === code);
+      list.push({...item, counter: 1})
+    }
+
+    const sum = list.reduce((a, b) => a + (b.counter * b.price), 0);
+
+    this.setState({
+      ...this.state,
+      basketItems: {
+        ...this.state.basketItems,
+        list,
+        count: list.length,
+        sum
+      }
+    })
+  }
+
+  removeItemBasket(code) {
+    const list = this.getState().basketItems.list.filter(item => item.code !== code);
+    const sum = list.reduce((a, b) => a + (b.counter * b.price), 0);
+
+    this.setState({
+      ...this.state,
+      basketItems: {
+        ...this.state.basketItems,
+        list,
+        count: list.length,
+        sum
+      }
+    })
+  }
+
 }
 
 export default Store;
